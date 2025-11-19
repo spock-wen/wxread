@@ -1,5 +1,4 @@
 # main.py 主逻辑：包括字段拼接、模拟请求
-import re
 import json
 import time
 import random
@@ -16,7 +15,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)-8s - 
 
 # 加密盐及其它默认值
 KEY = "3c5c8717f3daf09iop3423zafeqoi"
-COOKIE_DATA = {"rq": "%2Fweb%2Fbook%2Fread"}
+COOKIE_PAYLOADS = [
+    {"rq": "%2Fweb%2Fbook%2Fread"},
+    {"rq": "%2Fweb%2Fbook%2Fread", "ql": True}
+]
 READ_URL = "https://weread.qq.com/web/book/read"
 RENEW_URL = "https://weread.qq.com/web/login/renewal"
 FIX_SYNCKEY_URL = "https://weread.qq.com/web/book/chapterInfos"
@@ -42,12 +44,21 @@ def cal_hash(input_string):
     return hex(_7032f5 + _cc1055)[2:].lower()
 
 def get_wr_skey():
-    """刷新cookie密钥"""
-    response = requests.post(RENEW_URL, headers=headers, cookies=cookies,
-                             data=json.dumps(COOKIE_DATA, separators=(',', ':')))
-    for cookie in response.headers.get('Set-Cookie', '').split(';'):
-        if "wr_skey" in cookie:
-            return cookie.split('=')[-1][:8]
+    """刷新 cookie 密钥"""
+    for payload in COOKIE_PAYLOADS:
+        try:
+            response = requests.post(
+                RENEW_URL,
+                headers=headers,
+                cookies=cookies,
+                data=json.dumps(payload, separators=(',', ':'))
+            )
+            wr_skey = response.cookies.get("wr_skey")
+            if wr_skey:
+                return wr_skey[:8]
+        except requests.RequestException as e:
+            print(f"Request failed: {e}")
+            continue
     return None
 
 def fix_no_synckey():
